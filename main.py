@@ -4,6 +4,7 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 import json
 
+
 from db import init_db, save_email, get_all_emails, get_digest, clear_db
 from parser import parse_eml, apply_rules, load_rules
 
@@ -12,7 +13,7 @@ BASE = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
 
 init_db()
-RULES = load_rules()  # читаем rules.yaml один раз при старте
+RULES = load_rules()  
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -56,3 +57,4 @@ async def process(request: Request, files: list[UploadFile] = File(default=[])):
 async def clear():
     clear_db()
     return RedirectResponse("/", status_code=303)
+

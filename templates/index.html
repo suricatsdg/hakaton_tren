@@ -70,8 +70,14 @@
       <table class="w-full text-sm">
         <thead class="text-left text-slate-500 border-b">
           <tr>
-            <th class="py-2">Файл</th><th>Тема</th><th>Тип</th>
-            <th>Получатели</th><th>Вложения</th><th>Правила</th>
+            <th class="py-2">Файл</th>
+            <th>Тема</th>
+            <th>Тип</th>
+            <th>Получатели</th>
+            <th>Вложения</th>
+            <th>Дедлайн</th>  
+            <th>Правила</th>
+            
           </tr>
         </thead>
         <tbody>
@@ -90,6 +96,9 @@
                 {% if r.has_attachments %}
                   {{ "%.1f"|format(r.attachments_size / 1024) }} КБ
                 {% else %}—{% endif %}
+              </td>
+              <td class="text-xs {% if r.deadline %}text-red-600 font-bold{% endif %}">
+                {{ r.deadline or "—" }}
               </td>
               <td class="text-xs">
                 {% if r.rules_fired %}

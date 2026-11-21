@@ -3,23 +3,74 @@ from email.parser import BytesParser
 from bs4 import BeautifulSoup
 from pathlib import Path
 import yaml
+import re
+from datetime import datetime
+import dateparser
 
 # ---------- Классификация ----------
-KEYWORDS = {
-    "отчёт":   ["отчёт", "отчет", "report", "сводка за", "статистика за"],
-    "запрос":  ["прошу", "запрос", "request", "нужно", "требуется", "подскажите"],
-    "реклама": ["unsubscribe", "отписаться", "акция", "скидка", "utm_", "промо"],
-    "важное":  ["срочно", "важно", "critical", "urgent", "asap"],
+# Паттерны для поиска. Если паттерн сложный — используем регулярку.
+CLASSIFICATION_RULES = {
+    "отчёт": {
+        "patterns": [
+            r"отч[её]т", r"сводк[аи]", r"статистик[аи]", r"report",
+            r"во вложении", r"направляю", r"данные за"
+        ],
+        "weight": 1.0
+    },
+    "запрос": {
+        "patterns": [
+            r"прошу", r"запрос", r"необходимо", r"требуется", r"request",
+            r"подскажите", r"уточните", r"можете ли", r"согласуйте"
+        ],
+        "weight": 1.0
+    },
+    "реклама": {
+        "patterns": [
+            r"unsubscribe", r"отписаться", r"акци[яи]", r"скидк[аи]", 
+            r"utm_", r"промо", r"вебинар", r"спецпредложение", r"распродажа"
+        ],
+        "weight": 1.5  # Рекламу ловим с большим весом, чтобы она не просачивалась в другие типы
+    },
+    "важное": {
+        "patterns": [
+            r"срочно", r"важно", r"critical", r"urgent", r"asap",
+            r"внимание", r"немедленно", r"приоритет"
+        ],
+        "weight": 1.2
+    }
 }
 
-def classify(text: str) -> dict:
-    low = text.lower()
-    scores = {t: sum(kw in low for kw in kws) for t, kws in KEYWORDS.items()}
-    best = max(scores, key=scores.get)
-    if scores[best] == 0:
+import re
+
+def classify(subject: str, body: str) -> dict:
+    # Приводим к нижнему регистру
+    subject_low = subject.lower()
+    body_low = body.lower()
+    
+    scores = {}
+    
+    for email_type, rule_data in CLASSIFICATION_RULES.items():
+        score = 0
+        for pattern in rule_data["patterns"]:
+            
+            if re.search(pattern, subject_low):
+                score += 2 * rule_data["weight"]
+            
+            if re.search(pattern, body_low):
+                score += 1 * rule_data["weight"]
+        
+        scores[email_type] = score
+
+    best_type = max(scores, key=scores.get)
+    best_score = scores[best_type]
+    
+    if best_score == 0:
         return {"type": "уведомление", "confidence": 0.5}
-    total = sum(scores.values())
-    return {"type": best, "confidence": round(scores[best] / total, 2)}
+
+    total_score = sum(scores.values())
+    confidence = round(best_score / total_score, 2)
+    
+    return {"type": best_type, "confidence": confidence}
 
 # ---------- Извлечение тела (bs4) ----------
 def extract_body(msg) -> str:
@@ -73,6 +124,7 @@ def parse_eml(raw: bytes) -> dict:
             sizes.append(len(payload))
 
     body = extract_body(msg)
+    deadline = extract_deadline(body + " " + subject)
 
     return {
         "subject": subject,
@@ -80,7 +132,8 @@ def parse_eml(raw: bytes) -> dict:
         "recipients": recipients,
         "attachments": attachments,
         "attachments_total_size": sum(sizes),
-        "classification": classify(subject + "\n" + body),
+        "classification": classify(subject, body),
+        "deadline": deadline,
     }
 
 # ---------- Правила ----------
@@ -105,3 +158,40 @@ def apply_rules(email: dict, rules: list) -> list:
         if ok:
             fired.append(r["name"])
     return fired
+
+
+import re
+import dateparser
+
+def extract_deadline(text: str):
+    context_patterns = [
+        # "до 25.12.2024" или "до 25.12.24"
+        r'(?:до|к|дедлайн|срок|не позднее)\s+(\d{2}\.\d{2}\.\d{2,4})',
+        # "до 2024-12-25"
+        r'(?:до|к|дедлайн|срок|не позднее)\s+(\d{4}-\d{2}-\d{2})',
+        # "до 25 декабря 2024" (или без года)
+        r'(?:до|к|дедлайн|срок|не позднее)\s+(\d{1,2}\s+(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)(?:\s+\d{4})?)'
+    ]
+    
+    for pattern in context_patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            return match.group(1)
+
+
+    relative_patterns = [
+        r'\b(сегодня|завтра|послезавтра)\b',
+        r'\b(через\s+\d+\s+(?:день|дня|дней|недел[юи]))\b',
+        r'\b(до конца (?:дня|недели|месяца))\b'
+    ]
+    
+    for pattern in relative_patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            phrase = match.group(1)
+            parsed_date = dateparser.parse(phrase, languages=['ru'])
+            if parsed_date:
+                return parsed_date.strftime("%d.%m.%Y")
+            return f"~ {phrase}"
+            
+    return None

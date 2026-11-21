@@ -22,6 +22,7 @@ def init_db():
                 has_attachments INTEGER,
                 attachments_size INTEGER,
                 rules_fired TEXT,
+                deadline TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -31,8 +32,8 @@ def save_email(email: dict):
         conn.execute("""
             INSERT INTO emails
             (filename, subject, sender, recipients, email_type, confidence,
-             has_attachments, attachments_size, rules_fired)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             has_attachments, attachments_size, rules_fired, deadline)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             email.get("filename", ""),
             email.get("subject", ""),
@@ -43,6 +44,7 @@ def save_email(email: dict):
             int(bool(email.get("attachments"))),
             email.get("attachments_total_size", 0),
             ", ".join(email.get("rules_fired", [])),
+            email.get("deadline", ""),
         ))
 
 def get_all_emails():
