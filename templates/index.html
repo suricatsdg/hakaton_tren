@@ -1,0 +1,115 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Email MVP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+<div class="max-w-6xl mx-auto p-6">
+
+  <h1 class="text-3xl font-bold mb-1">📬 Email MVP</h1>
+  <p class="text-slate-500 mb-6">Загрузите .eml или .json — данные сохраняются в SQLite.</p>
+
+  <form method="post" enctype="multipart/form-data"
+        class="bg-white rounded-xl shadow p-6 mb-6">
+    <input type="file" name="files" multiple accept=".eml,.json"
+      class="block w-full text-sm
+             file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0
+             file:bg-indigo-600 file:text-white hover:file:bg-indigo-700" />
+    <div class="mt-4 flex gap-3">
+      <button type="submit"
+        class="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+        Обработать
+      </button>
+    </div>
+  </form>
+
+  {% if digest and digest.total > 0 %}
+  <div class="bg-white rounded-xl shadow p-6 mb-6">
+    <h2 class="text-xl font-semibold mb-3">📊 Сводка по всей базе</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+      <div class="bg-slate-100 rounded-lg p-3">
+        <div class="text-xs text-slate-500">Всего</div>
+        <div class="text-2xl font-bold">{{ digest.total }}</div>
+      </div>
+      <div class="bg-slate-100 rounded-lg p-3">
+        <div class="text-xs text-slate-500">С вложениями</div>
+        <div class="text-2xl font-bold">{{ digest.with_attachments }}</div>
+      </div>
+      <div class="bg-slate-100 rounded-lg p-3">
+        <div class="text-xs text-slate-500">Правил сработало</div>
+        <div class="text-2xl font-bold">{{ digest.rules_fired_total }}</div>
+      </div>
+    </div>
+    <div class="bg-indigo-50 rounded-lg p-3">
+      <div class="text-xs text-slate-500 mb-1">По типам</div>
+      <div class="flex flex-wrap gap-2">
+        {% for t, c in digest.by_type.items() %}
+          <span class="px-2 py-1 bg-white rounded text-xs">{{ t }}: <b>{{ c }}</b></span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if rows %}
+  <div class="bg-white rounded-xl shadow p-6">
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="text-xl font-semibold">📨 История писем</h2>
+      <form method="post" action="/clear"
+            onsubmit="return confirm('Удалить все письма из базы?')">
+        <button type="submit"
+          class="px-4 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm">
+          Очистить базу
+        </button>
+      </form>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="text-left text-slate-500 border-b">
+          <tr>
+            <th class="py-2">Файл</th><th>Тема</th><th>Тип</th>
+            <th>Получатели</th><th>Вложения</th><th>Правила</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+            <tr class="border-b hover:bg-slate-50">
+              <td class="py-2 px-1 text-xs text-slate-500">{{ r.filename }}</td>
+              <td class="max-w-xs truncate" title="{{ r.subject }}">{{ r.subject }}</td>
+              <td>
+                <span class="px-2 py-0.5 rounded text-xs bg-indigo-100 text-indigo-800">
+                  {{ r.email_type }}
+                </span>
+                <span class="text-xs text-slate-400">{{ r.confidence }}</span>
+              </td>
+              <td class="text-xs">{{ r.recipients }}</td>
+              <td class="text-xs">
+                {% if r.has_attachments %}
+                  {{ "%.1f"|format(r.attachments_size / 1024) }} КБ
+                {% else %}—{% endif %}
+              </td>
+              <td class="text-xs">
+                {% if r.rules_fired %}
+                  {% for rule in r.rules_fired.split(", ") %}
+                    <span class="inline-block bg-amber-100 text-amber-800 rounded px-1.5 py-0.5 mr-1">
+                      {{ rule }}
+                    </span>
+                  {% endfor %}
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <p class="text-slate-400">Писем пока нет. Загрузите файлы выше.</p>
+  {% endif %}
+
+</div>
+</body>
+</html>

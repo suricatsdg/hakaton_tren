@@ -1,0 +1,22 @@
+﻿rules:
+  - name: "Отчёт с вложениями — в трекер"
+    condition:
+      type: "отчёт"
+      has_attachments: true
+    action: "create_task"
+
+  - name: "Реклама — в спам"
+    condition:
+      type: "реклама"
+    action: "move_to_spam"
+
+  - name: "Важное — уведомить"
+    condition:
+      type: "важное"
+    action: "send_alert"
+
+  - name: "Запрос без вложений — ответить шаблоном"
+    condition:
+      type: "запрос"
+      has_attachments: false
+    action: "auto_reply"
